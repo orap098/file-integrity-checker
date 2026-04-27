@@ -31,4 +31,4 @@ jobs:
 
       - name: Validar execução básica
         run: |
-          python integrity_check.py --help
+          python main.py --help
