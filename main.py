@@ -3,7 +3,7 @@ import os
 
 
 hash = hashlib.sha256()
-arquivo = input("Escreva o nome do arquivo: ")
+arquivo = "teste.txt"
 #path = input("caminho: ")
 
 with open(arquivo,  "rb") as f:
