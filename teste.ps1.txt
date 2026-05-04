@@ -1,0 +1,41 @@
+# Conectar ao Teams
+Connect-MicrosoftTeams
+
+Write-Host "🔍 Buscando uso real de aplicativos..." -ForegroundColor Cyan
+
+# Primeiro, vamos ver TODOS os apps instalados em TODAS as equipes
+Write-Host "`n📊 LISTANDO TODOS OS APPS INSTALADOS NAS EQUIPES:" -ForegroundColor Yellow
+
+$AllTeams = Get-Team
+$AllAppsFound = @()
+
+foreach ($Team in $AllTeams) {
+    try {
+        $TeamApps = Get-TeamAppInstallation -GroupId $Team.GroupId
+        foreach ($App in $TeamApps) {
+            $AppInfo = [PSCustomObject]@{
+                TeamName = $Team.DisplayName
+                AppName = $App.DisplayName
+                AppId = $App.AppId
+                InstallationDate = $App.InstallationDate
+            }
+            $AllAppsFound += $AppInfo
+        }
+    }
+    catch {
+        # Ignora erros e continua
+    }
+}
+
+# Mostrar todos os apps encontrados
+if ($AllAppsFound.Count -gt 0) {
+    Write-Host "`n🎯 APPS ENCONTRADOS:" -ForegroundColor Green
+    $AllAppsFound | Format-Table -AutoSize
+    
+    # Exportar lista completa
+    $DesktopPath = [Environment]::GetFolderPath("Desktop")
+    $AllAppsFound | Export-Csv -Path "$DesktopPath\Todos_Apps_Teams.csv" -Encoding UTF8 -NoTypeInformation
+    Write-Host "📊 Arquivo salvo: $DesktopPath\Todos_Apps_Teams.csv" -ForegroundColor Green
+} else {
+    Write-Host "❌ Nenhum app encontrado nas equipes" -ForegroundColor Red
+}
