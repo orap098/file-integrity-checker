@@ -85,7 +85,7 @@ Saída esperada no segundo comando: `Arquivo íntegro`.
 
 ```bash
 python main.py init teste.log
-Add-Content ola.log "alteracao"
+Add-Content teste.log "alteracao"
 python main.py check teste.log
 ```
 
