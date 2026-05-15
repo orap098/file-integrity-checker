@@ -32,15 +32,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Validar sintaxe dos módulos principais
+      - name: Validar sintaxe
         run: |
           python -m py_compile main.py crypto.py
 
-      - name: Validar execução básica
+      - name: Validar execução
         run: |
           python main.py --help
 
-      - name: Testar com Docker Compose
+      - name: Testar Docker Compose
         env:
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
