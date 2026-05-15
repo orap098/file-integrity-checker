@@ -75,8 +75,8 @@ Use os comandos abaixo, com o ambiente virtual ativo.
 ### Caso 1: arquivo íntegro
 
 ```bash
-python main.py init ola.log
-python main.py check ola.log
+python main.py init teste.log
+python main.py check teste.log
 ```
 
 Saída esperada no segundo comando: `Arquivo íntegro`.

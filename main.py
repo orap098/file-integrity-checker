@@ -2,14 +2,16 @@ import argparse
 import os
 from pathlib import Path
 import sys
-
 import psycopg2
+from dotenv import load_dotenv
 
 from crypto import (
     calculate_hash,
     sign_hash,
     verify_signature
 )
+
+load_dotenv()
 
 DB_CONFIG = {
     "host": os.getenv("POSTGRES_HOST"),
