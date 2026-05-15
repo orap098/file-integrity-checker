@@ -1,17 +1,12 @@
-# docker-compose.yml
 services:
-  db:
-    image: postgres:16
-    container_name: postgres
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    ports:
-      - "5432:5432"
-    volumes:
-      - db_data:/var/lib/postgresql/data
-      - ./db/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
 
-volumes:
-  db_data:
+  integrity-check:
+    build: .
+
+    container_name: integrity-check
+
+    volumes:
+      - ./app:/app
+
+    stdin_open: true
+    tty: true
