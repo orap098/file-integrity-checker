@@ -1,66 +1,114 @@
-import hashlib
-import psycopg2
-import os
-from datetime import datetime
-from dotenv import load_dotenv
+import json
+import argparse
+import sys
+
+from crypto import (
+    calculate_hash,
+    sign_hash,
+    verify_signature
+)
+
+DB_FILE = "integrity_db.json"
 
 
-load_dotenv()
+def load_db():
+
+    with open(DB_FILE, "r") as f:
+        return json.load(f)
 
 
-def conectar_banco():
-    conexao = psycopg2.connect(
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT"),
-        database=os.getenv("POSTGRES_DB"),
-        user=os.getenv("POSTGRES_USER"),
-        password=os.getenv("POSTGRES_PASSWORD")
+def save_db(data):
+
+    with open(DB_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+
+def init(path):
+
+    db = load_db()
+
+    file_hash = calculate_hash(path)
+
+    signature = sign_hash(file_hash)
+
+    db[path] = {
+        "hash": file_hash,
+        "signature": signature
+    }
+
+    save_db(db)
+
+    print("Arquivo Registrado")
+
+
+def check(path):
+
+    db = load_db()
+
+    if path not in db:
+        print("Arquivo não monitorado")
+        sys.exit(3)
+
+    stored_hash = db[path]["hash"]
+
+    stored_signature = db[path]["signature"]
+
+    current_hash = calculate_hash(path)
+
+    if current_hash == stored_hash:
+
+        print(" Arquivo íntegro")
+        sys.exit(0)
+
+    valid_signature = verify_signature(
+        stored_hash,
+        stored_signature
     )
 
-    return conexao
+    if valid_signature:
+
+        print("Arquivo alterado")
+        sys.exit(2)
+
+    else:
+
+        print("Assinatura inválida")
+        sys.exit(3)
 
 
-def gerar_hash_arquivo(caminho_arquivo):
-    sha256 = hashlib.sha256()
+def update(path):
 
-    with open(caminho_arquivo, "rb") as arquivo:
-        for byte in iter(lambda: arquivo.read(4096), b""):
-            sha256.update(byte)
+    db = load_db()
 
-    return sha256.hexdigest()
+    new_hash = calculate_hash(path)
 
+    new_signature = sign_hash(new_hash)
 
-def salvar_hash_no_banco(caminho_arquivo, hash_gerado):
-    conexao = conectar_banco()
-    cursor = conexao.cursor()
+    db[path] = {
+        "hash": new_hash,
+        "signature": new_signature
+    }
 
-    comando_sql = """
-        INSERT INTO hashes (path, hash, data_criacao)
-        VALUES (%s, %s, %s);
-    """
+    save_db(db)
 
-    cursor.execute(
-        comando_sql,
-        (
-            caminho_arquivo,
-            hash_gerado,
-            datetime.now()
-        )
-    )
-
-    conexao.commit()
-
-    cursor.close()
-    conexao.close()
+    print("Hash atualizado")
 
 
-arquivo = "teste.txt"
+parser = argparse.ArgumentParser()
 
-hash_gerado = gerar_hash_arquivo(arquivo)
+parser.add_argument("command")
+parser.add_argument("path")
 
-print("Hash gerado:")
-print(hash_gerado)
+args = parser.parse_args()
 
-salvar_hash_no_banco(arquivo, hash_gerado)
+if args.command == "init":
+    init(args.path)
 
-print("Hash salvo no banco com sucesso!")
+elif args.command == "check":
+    check(args.path)
+
+elif args.command == "update":
+    update(args.path)
+
+else:
+    print("Comando inválido")
