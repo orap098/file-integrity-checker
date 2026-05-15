@@ -5,12 +5,13 @@ on:
     branches:
       - dev
       - main
-      - "feature/**"
 
   pull_request:
     branches:
       - dev
       - main
+
+  workflow_dispatch:
 
 jobs:
   test:
@@ -24,11 +25,28 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Instalar dependências
         run: |
-          pip install -r requirements.txt || true
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validar sintaxe dos módulos principais
+        run: |
+          python -m py_compile main.py crypto.py
 
       - name: Validar execução básica
         run: |
           python main.py --help
+
+      - name: Testar com Docker Compose
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          PGCRYPTO_PASSPHRASE: ${{ secrets.PGCRYPTO_PASSPHRASE  }}
+        run: |
+          docker compose up -d
+          sleep 5
+          docker compose exec -T integrity-check python main.py --help

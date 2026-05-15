@@ -1,6 +1,9 @@
-import json
 import argparse
+import os
+from pathlib import Path
 import sys
+
+import psycopg2
 
 from crypto import (
     calculate_hash,
@@ -8,50 +11,96 @@ from crypto import (
     verify_signature
 )
 
-DB_FILE = "integrity_db.json"
+DB_CONFIG = {
+    "host": os.getenv("POSTGRES_HOST"),
+    "port": os.getenv("POSTGRES_PORT"),
+    "dbname": os.getenv("POSTGRES_DB"),
+    "user": os.getenv("POSTGRES_USER"),
+    "password": os.getenv("POSTGRES_PASSWORD"),
+}
+
+PGCRYPTO_PASSPHRASE = os.getenv("PGCRYPTO_PASSPHRASE", "integrity-key")
 
 
-def load_db():
+def get_connection():
 
-    with open(DB_FILE, "r") as f:
-        return json.load(f)
+    return psycopg2.connect(**DB_CONFIG)
 
 
-def save_db(data):
+def ensure_table(connection):
 
-    with open(DB_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+            CREATE TABLE IF NOT EXISTS hashes (
+                id SERIAL PRIMARY KEY,
+                path VARCHAR(255) UNIQUE NOT NULL,
+                hash TEXT NOT NULL,
+                signature BYTEA NOT NULL,
+                data_criacao TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+    connection.commit()
+
+
+def get_record(path):
+
+    with get_connection() as connection:
+        ensure_table(connection)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT hash, pgp_sym_decrypt(signature, %s) FROM hashes WHERE path = %s",
+                (PGCRYPTO_PASSPHRASE, path)
+            )
+            return cursor.fetchone()
+
+
+def save_record(path, file_hash, signature):
+
+    with get_connection() as connection:
+        ensure_table(connection)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO hashes (path, hash, signature, data_criacao)
+                VALUES (%s, %s, pgp_sym_encrypt(%s, %s), CURRENT_TIMESTAMP)
+                ON CONFLICT (path)
+                DO UPDATE SET
+                    hash = EXCLUDED.hash,
+                    signature = EXCLUDED.signature,
+                    data_criacao = CURRENT_TIMESTAMP
+                """,
+                (path, file_hash, signature, PGCRYPTO_PASSPHRASE)
+            )
+
+        connection.commit()
 
 
 def init(path):
-
-    db = load_db()
 
     file_hash = calculate_hash(path)
 
     signature = sign_hash(file_hash)
 
-    db[path] = {
-        "hash": file_hash,
-        "signature": signature
-    }
-
-    save_db(db)
+    save_record(path, file_hash, signature)
 
     print("Arquivo Registrado")
 
 
 def check(path):
 
-    db = load_db()
+    record = get_record(path)
 
-    if path not in db:
+    if record is None:
         print("Arquivo não monitorado")
         sys.exit(3)
 
-    stored_hash = db[path]["hash"]
-
-    stored_signature = db[path]["signature"]
+    stored_hash, stored_signature = record
 
     current_hash = calculate_hash(path)
 
@@ -78,18 +127,16 @@ def check(path):
 
 def update(path):
 
-    db = load_db()
+    if Path(path).suffix.lower() == ".log":
+        print("Update bloqueado para arquivos .log")
+        print("Use apenas check para detectar adulteracao em logs")
+        sys.exit(4)
 
     new_hash = calculate_hash(path)
 
     new_signature = sign_hash(new_hash)
 
-    db[path] = {
-        "hash": new_hash,
-        "signature": new_signature
-    }
-
-    save_db(db)
+    save_record(path, new_hash, new_signature)
 
     print("Hash atualizado")
 
