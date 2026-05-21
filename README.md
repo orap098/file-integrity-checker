@@ -38,6 +38,7 @@ Depois edite `.env` e defina valores seguros para:
 
 ```bash
 # 1. Criar e ativar o ambiente virtual
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
 # 2. Instalar dependências
